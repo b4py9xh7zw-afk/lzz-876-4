@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}编辑测验 · {{ quiz.title }}{% endblock %}
+{% block content %}
+<a href="/publisher/quizzes" class="small">← 返回题库</a>
+<h1 class="page-title" style="margin-top:8px">{{ quiz.title }}</h1>
+<p class="page-sub">
+  状态：
+  {% if quiz.status.value == 'published' %}<span class="pill pill-green">已发布 v{{ quiz.version }}</span>
+  {% elif quiz.status.value == 'closed' %}<span class="pill pill-gray">已关闭</span>
+  {% else %}<span class="pill pill-amber">草稿（发布后员工可见）</span>{% endif %}
+</p>
+
+<div class="notice notice-amber small">
+  已发布测验的历史答卷不受后续编辑影响——开卷时题目已逐题快照并写入证据。
+  每次保存都会记录一条 quiz.questions_updated 事件。
+</div>
+
+<form method="post" action="/publisher/quizzes/{{ quiz.id }}/edit" class="card">
+  <h2>基本信息</h2>
+  <label class="field"><span>标题</span><input type="text" name="title" value="{{ quiz.title }}"></label>
+  <label class="field"><span>说明</span><textarea name="description">{{ quiz.description }}</textarea></label>
+  <label class="field"><span>学习材料</span><textarea name="learning_content" style="min-height:120px">{{ quiz.learning_content }}</textarea></label>
+  <div class="row3">
+    <label class="field"><span>普通岗及格线</span><input type="number" name="pass_score_normal" value="{{ quiz.pass_score_normal }}"></label>
+    <label class="field"><span>关键岗及格线</span><input type="number" name="pass_score_key" value="{{ quiz.pass_score_key }}"></label>
+    <label class="field"><span>高风险岗及格线</span><input type="number" name="pass_score_high" value="{{ quiz.pass_score_high }}"></label>
+  </div>
+
+  <h2>题目（最多 {{ max_questions }} 题；勾选选项前的复选框标记正确答案）</h2>
+  {% for i in range(max_questions) %}
+    {% set q = quiz.questions[i] if i < quiz.questions|length else None %}
+    <div class="editor-q" data-slot="{{ i }}">
+      <input type="hidden" name="qid_present" value="{{ q.id if q else '' }}">
+      {% if q %}<input type="hidden" name="qid_{{ i }}" value="{{ q.id }}">{% endif %}
+      <div class="grid">
+        <label class="field" style="margin:0"><span>题型</span>
+          <select name="qtype_{{ i }}" class="qtype" data-slot="{{ i }}">
+            <option value="single" {{ 'selected' if q and q.qtype.value == 'single' }}>单选</option>
+            <option value="multiple" {{ 'selected' if q and q.qtype.value == 'multiple' }}>多选</option>
+            <option value="bool" {{ 'selected' if q and q.qtype.value == 'bool' }}>判断</option>
+          </select>
+        </label>
+        <label class="field" style="margin:0"><span>分值</span>
+          <input type="number" name="score_{{ i }}" value="{{ q.score if q else 10 }}" min="1"></label>
+        <label class="field" style="margin:0"><span>题干（留空表示本槽位无题目）</span>
+          <input type="text" name="stem_{{ i }}" value="{{ q.stem if q else '' }}"></label>
+      </div>
+      <div class="opts" data-slot="{{ i }}">
+        {% set boolmode = q and q.qtype.value == 'bool' %}
+        {% for oi in range(4) %}
+        <div class="row2 opt-row" style="margin-top:6px;grid-template-columns: 140px 1fr {{ '' }}">
+          <label class="opt" style="display:flex;align-items:center;gap:6px;margin:0">
+            <input type="{{ 'checkbox' if q and q.qtype.value == 'multiple' else 'radio' }}"
+                   class="ans-box" name="ans_{{ i }}" value="{{ i }}:{{ oi }}"
+                   {{ 'checked' if q and oi in q.answer }}
+                   {{ 'disabled' if boolmode and oi > 1 }}>
+            <span class="opt-letter">{{ ['A','B','C','D'][oi] }}</span>
+          </label>
+          <input type="text" class="opt-input" name="opt_{{ i }}_{{ oi }}"
+                 value="{{ q.options[oi] if q and q.options and oi < q.options|length else '' }}"
+                 placeholder="选项内容（判断题无需填写）"
+                 {{ 'disabled' if boolmode and oi > 1 }}>
+        </div>
+        {% endfor %}
+        <div class="small muted bool-hint" style="display:{{ 'block' if boolmode else 'none' }}">
+          判断题固定选项：A=错误，B=正确。
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+
+  <button class="btn" type="submit">保存题目与设置</button>
+  {% if quiz.status.value == 'draft' %}
+  <form method="post" action="/publisher/quizzes/{{ quiz.id }}/publish" class="inline" style="display:inline;margin-left:10px">
+    <button class="btn btn-danger" type="submit"
+      onclick="return confirm('发布将固化题目快照并记录哈希，发布后应通过新版本修改，确认？')">
+      保存后请先点此发布 →</button>
+  </form>
+  {% endif %}
+</form>
+
+{% if quiz.status.value == 'draft' %}
+<form method="post" action="/publisher/quizzes/{{ quiz.id }}/publish">
+  <button class="btn" type="submit" style="margin-bottom:30px">确认发布此测验</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.qtype').forEach(function(sel){
+  sel.addEventListener('change', function(){
+    var i = sel.dataset.slot;
+    var box = document.querySelector('.opts[data-slot="'+i+'"]');
+    var isBool = sel.value === 'bool';
+    var isMulti = sel.value === 'multiple';
+    box.querySelectorAll('.opt-row').forEach(function(row, oi){
+      var input = row.querySelector('.ans-box');
+      var text = row.querySelector('.opt-input');
+      input.name = 'ans_' + i;
+      input.type = isMulti ? 'checkbox' : 'radio';
+      if (isBool && oi > 1) { input.disabled = true; text.disabled = true; text.value=''; }
+      else { input.disabled = false; text.disabled = isBool;
+        if (isBool) text.value = oi === 0 ? '错误' : (oi === 1 ? '正确' : ''); }
+    });
+    box.querySelector('.bool-hint').style.display = isBool ? 'block' : 'none';
+  });
+});
+</script>
+{% endblock %}

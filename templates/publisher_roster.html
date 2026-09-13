@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}花名册 · {{ assignment.title }}{% endblock %}
+{% block container_class %}wide{% endblock %}
+{% block content %}
+<a href="/dashboard" class="small">← 返回工作台</a>
+<h1 class="page-title" style="margin-top:8px">{{ assignment.title }}</h1>
+<p class="page-sub">{{ assignment.quiz.title }} · v{{ assignment.quiz.version }} ·
+开放于 {{ assignment.opened_at | dt }} UTC ·
+{% if assignment.closed_at %}已于 {{ assignment.closed_at | dt }} 关闭{% else %}开放中{% endif %}</p>
+
+<div class="stats">
+  <div class="stat"><div class="num">{{ counts.total }}</div><div class="lbl">应学人数</div></div>
+  <div class="stat"><div class="num">{{ counts.completed }}</div><div class="lbl">已达标并签署</div></div>
+  <div class="stat"><div class="num">{{ counts.passed_pending_signature }}</div><div class="lbl">达标待签署</div></div>
+  <div class="stat alarm"><div class="num">{{ counts.failed }}</div><div class="lbl">未达标（含高风险硬门槛）</div></div>
+  <div class="stat"><div class="num">{{ counts.not_started }}</div><div class="lbl">未开始</div></div>
+</div>
+
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <h2 style="margin:0">逐人花名册（可证明“谁在什么时候学过”）</h2>
+    <div class="no-print">
+      <a class="btn btn-sm btn-ghost" href="/publisher/assignments/{{ assignment.id }}/roster.csv">导出 CSV</a>
+      {% if not assignment.closed_at %}
+      <form method="post" action="/publisher/assignments/{{ assignment.id }}/close" class="inline">
+        <button class="btn btn-sm btn-danger"
+          onclick="return confirm('关闭后员工无法再开始新答卷，确认？')">关闭任务</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  <table style="margin-top:12px">
+    <thead><tr>
+      <th>工号</th><th>姓名</th><th>部门/岗位</th><th>风险等级</th><th>个人门槛</th>
+      <th>状态</th><th>提交次数</th><th>最好成绩</th><th>交卷时间(UTC)</th>
+      <th>签署时间(UTC)</th><th>个人证据</th>
+    </tr></thead>
+    <tbody>
+    {% for r in roster %}
+      <tr>
+        <td>{{ r.employee_no }}</td>
+        <td><b>{{ r.full_name }}</b></td>
+        <td class="small">{{ r.department }}<br>{{ r.position }}</td>
+        <td>
+          {% if r.risk_tier == 'high' %}<span class="pill pill-high">高风险</span>
+          {% elif r.risk_tier == 'key' %}<span class="pill pill-amber">关键</span>
+          {% else %}<span class="pill pill-gray">普通</span>{% endif %}
+        </td>
+        <td>{{ r.required_score }}</td>
+        <td>
+          {% if r.state == 'completed' %}<span class="pill pill-green">{{ state_labels[r.state] }}</span>
+          {% elif r.state == 'passed_pending_signature' %}<span class="pill pill-amber">{{ state_labels[r.state] }}</span>
+          {% elif r.state == 'failed' %}<span class="pill pill-red">{{ state_labels[r.state] }}</span>
+          {% elif r.state == 'in_progress' %}<span class="pill pill-blue">{{ state_labels[r.state] }}</span>
+          {% else %}<span class="pill pill-gray">{{ state_labels[r.state] }}</span>{% endif %}
+        </td>
+        <td>{{ r.attempt_count }}</td>
+        <td>{% if r.best_score is not none %}
+          <b class="{{ 'score-pass' if r.passed else 'score-fail' }}">{{ r.best_score }}</b>
+          {% else %}—{% endif %}</td>
+        <td class="small">{{ r.submitted_at | dt }}</td>
+        <td class="small">{{ r.signed_at | dt }}</td>
+        <td class="small">
+          {% if r.attempt_id %}
+            <a href="/attempts/{{ r.attempt_id }}/evidence">证据页</a> ·
+            <a href="/attempts/{{ r.attempt_id }}/evidence.json" target="_blank">JSON</a>
+          {% else %}—{% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

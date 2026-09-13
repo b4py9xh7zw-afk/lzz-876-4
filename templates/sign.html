@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}签署学习确认 · {{ quiz.title }}{% endblock %}
+{% block content %}
+<a href="/attempts/{{ attempt.id }}/result" class="small">← 返回成绩</a>
+<h1 class="page-title" style="margin-top:8px">学习确认与合规承诺签署</h1>
+<p class="page-sub">{{ quiz.title }} · 成绩 {{ attempt.score }} / {{ attempt.total_score }}
+  （门槛 {{ attempt.required_pass_score }} 分）</p>
+
+<div class="card">
+  <h2>确认书内容</h2>
+  <div class="learning">{{ statement }}</div>
+
+  <div class="notice notice-amber small">
+    本电子签署将记录：签署人工号、姓名、IP、浏览器指纹(UA)、签署时间（UTC）、成绩与门槛，
+    并对上述内容计算 SHA-256 签名哈希后写入证据链。<b>签署记录不可删除、不可修改。</b>
+  </div>
+
+  <form method="post" action="/attempts/{{ attempt.id }}/sign">
+    <label class="field"><span>请输入本人姓名作为电子签名</span>
+      <input type="text" name="signature_text" placeholder="例如：张敏" required></label>
+    <label class="field"><span>请输入本人工号以核验身份</span>
+      <input type="text" name="employee_no" placeholder="{{ current_user.employee_no }}" required>
+      <span class="small muted">你的工号：{{ current_user.employee_no }}（须一致才能签署）</span></label>
+    <label class="opt"><input type="checkbox" name="confirm_identity" required>
+      本人确认已真实学习并独立完成测验，同意按上述承诺承担责任。</label>
+    <div style="margin-top:16px">
+      <button class="btn" type="submit">确认签署并固化证据</button>
+      <a class="btn btn-ghost" href="/attempts/{{ attempt.id }}/result">暂不签署</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

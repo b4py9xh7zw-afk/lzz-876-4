@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}测验结果 · {{ quiz.title }}{% endblock %}
+{% block content %}
+<a href="/dashboard" class="small">← 返回工作台</a>
+<div class="card" style="margin-top:10px">
+  <h2>{{ quiz.title }} · 第 {{ submitted_total }} 次提交</h2>
+  <div style="display:flex;gap:30px;align-items:center;flex-wrap:wrap">
+    <div class="score-big {{ 'score-pass' if attempt.passed else 'score-fail' }}">
+      {{ attempt.score }}<span class="small" style="font-size:18px"> / {{ attempt.total_score }}</span>
+    </div>
+    <div>
+      <p style="margin:4px 0">本人岗位及格线：<b>{{ attempt.required_pass_score }}</b> 分</p>
+      {% if attempt.passed %}
+        <span class="pill pill-green" style="font-size:14px">✓ 成绩达标</span>
+      {% else %}
+        <span class="pill pill-red" style="font-size:14px">✗ 未达标</span>
+      {% endif %}
+      <p class="small muted" style="margin-top:8px">交卷时间(UTC)：{{ attempt.submitted_at | dt }} · 作答 IP：{{ attempt.client_ip }}</p>
+    </div>
+  </div>
+
+  {% if attempt.passed %}
+    {% if confirmation %}
+      <div class="notice notice-green" style="margin-top:16px">
+        你已于 <b>{{ confirmation.signed_at | dt }}</b> 完成学习确认与合规承诺签署。
+      </div>
+      <a class="btn" href="/attempts/{{ attempt.id }}/sign">查看/管理确认</a>
+      <a class="btn btn-ghost" href="/attempts/{{ attempt.id }}/evidence">查看学习证据</a>
+    {% else %}
+      <div class="notice notice-amber" style="margin-top:16px">
+        成绩已达标，但还需完成<b>学习确认与合规承诺签署</b>才算完成任务。
+      </div>
+      <a class="btn" href="/attempts/{{ attempt.id }}/sign">去签署学习确认 →</a>
+      <a class="btn btn-ghost" href="/attempts/{{ attempt.id }}/evidence">先看证据</a>
+    {% endif %}
+  {% else %}
+    {% if can_retry %}
+      <div class="notice notice-red" style="margin-top:16px">
+        {% if current_user.risk_tier.value == 'high' %}
+        高风险岗位必须达到 {{ attempt.required_pass_score }} 分。你还有
+        {{ attempt.max_attempts - submitted_total }} 次机会，请重新学习后再考。
+        {% else %}
+        未达到及格线。你还有 {{ attempt.max_attempts - submitted_total }} 次重考机会。
+        {% endif %}
+      </div>
+      <a class="btn btn-danger" href="/assignments/{{ assignment.id }}/learn">重新学习并重考</a>
+    {% else %}
+      <div class="notice notice-red"><b>3 次机会已用完仍未达标。</b>
+        系统已记录全部尝试，法务/审计部门将在花名册中看到该情况。</div>
+    {% endif %}
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>答题回顾</h2>
+  {% set grading = attempt.grading %}
+  {% for d in grading.details %}
+    {% set q = attempt.question_snapshot | selectattr('id','equalto',d.question_id) | first %}
+    <div class="q-block">
+      <div class="qhead">
+        {{ loop.index }}. {{ q.stem }}
+        {% if d.ok %}<span class="pill pill-green">回答正确 +{{ d.score or q.score }}分</span>
+        {% else %}<span class="pill pill-red">不得分</span>{% endif %}
+      </div>
+      {% for opt in q.options %}
+        {% set i = loop.index0 %}
+        <label class="opt" style="color:
+          {% if i in d.correct and i in d.given %}var(--green)
+          {% elif i in d.correct %}var(--green)
+          {% elif i in d.given %}var(--red){% else %}inherit{% endif %}">
+          {{ ['A','B','C','D'][i] }}. {{ opt }}
+          {% if i in d.correct %} ✓ 正确答案{% endif %}
+          {% if i in d.given %}（你的选择）{% endif %}
+        </label>
+      {% endfor %}
+    </div>
+  {% endfor %}
+  <p class="small muted">判分明细已随交卷事件写入证据链；任何对分数的事后修改都会导致证据校验失败。</p>
+</div>
+{% endblock %}

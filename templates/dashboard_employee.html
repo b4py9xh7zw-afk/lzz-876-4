@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}我的工作台{% endblock %}
+{% block content %}
+<h1 class="page-title">我的合规学习工作台</h1>
+<p class="page-sub">
+  {{ current_user.full_name }} · {{ current_user.department }} · {{ current_user.position }} ·
+  {% set rt = current_user.risk_tier.value %}
+  岗位风险等级：
+  {% if rt == 'high' %}<span class="pill pill-high">高风险岗位（及格线 90 分，硬性要求）</span>
+  {% elif rt == 'key' %}<span class="pill pill-amber">关键岗位（及格线 80 分）</span>
+  {% else %}<span class="pill pill-gray">普通岗位（及格线 60 分）</span>{% endif %}
+</p>
+
+{% set ns_hard = items | selectattr('info.high_risk_hard_gate', 'equalto', true) | list %}
+{% if ns_hard %}
+<div class="notice notice-red">
+  <b>高风险岗位硬性要求未达成：</b>
+  你有 {{ ns_hard|length }} 项红线测验未达到本人岗位及格线，必须达标并完成学习确认，
+  相关情况将由法务/审计部门跟踪。
+</div>
+{% endif %}
+
+<div class="card" id="assignments">
+  <h2>待办学习 / 测评任务（{{ items|length }}）</h2>
+  {% if not items %}
+  <p class="muted">当前没有开放中的学习任务。</p>
+  {% endif %}
+  <table>
+    <thead><tr><th>任务</th><th>类别</th><th>我的及格线</th><th>状态</th><th>最好成绩</th><th>截止时间</th><th></th></tr></thead>
+    <tbody>
+    {% for it in items %}
+      {% set a = it.assignment %}{% set info = it.info %}{% set q = it.quiz %}
+      <tr>
+        <td><b>{{ a.title }}</b><br><span class="small muted">{{ q.title }} · v{{ q.version }}</span></td>
+        <td>{{ category_labels.get(q.category, q.category) }}</td>
+        <td><b>{{ info.required_score }}</b> 分</td>
+        <td>
+          {% if info.state == 'completed' %}<span class="pill pill-green">✓ 已完成签署</span>
+          {% elif info.state == 'passed_pending_signature' %}<span class="pill pill-amber">达标，待签署确认</span>
+          {% elif info.state == 'failed' %}<span class="pill pill-red">未达标</span>
+          {% elif info.state == 'in_progress' %}<span class="pill pill-blue">答题中</span>
+          {% else %}<span class="pill pill-gray">未开始</span>{% endif %}
+        </td>
+        <td>{% if info.best %}{{ info.best.score }} / {{ info.best.total_score }}{% else %}—{% endif %}</td>
+        <td class="small">{{ a.due_at | dtonly }}</td>
+        <td>
+          {% if info.state == 'completed' %}
+            <a class="btn btn-sm btn-ghost" href="/attempts/{{ info.best.id }}/evidence">查看证据</a>
+          {% elif info.state == 'passed_pending_signature' %}
+            <a class="btn btn-sm" href="/attempts/{{ info.best.id }}/sign">去签署</a>
+          {% elif info.state == 'failed' and info.attempt_count < 3 %}
+            <a class="btn btn-sm" href="/assignments/{{ a.id }}/learn">重新学习再考</a>
+          {% elif info.state == 'in_progress' %}
+            <a class="btn btn-sm" href="/attempts/{{ info.attempts[0].id }}">继续答题</a>
+          {% else %}
+            <a class="btn btn-sm" href="/assignments/{{ a.id }}/learn">开始学习</a>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>我的全部作答与签署记录</h2>
+  <table>
+    <thead><tr><th>测验</th><th>版本</th><th>分数</th><th>门槛</th><th>结果</th><th>交卷时间(UTC)</th><th>证据</th></tr></thead>
+    <tbody>
+    {% for at in attempts %}
+      <tr>
+        <td>{{ at.quiz.title }}</td>
+        <td>v{{ at.quiz_version }}</td>
+        <td>{% if at.score is not none %}{{ at.score }}/{{ at.total_score }}{% else %}—{% endif %}</td>
+        <td>{{ at.required_pass_score }}</td>
+        <td>
+          {% if at.status.value == 'in_progress' %}<span class="pill pill-blue">进行中</span>
+          {% elif at.passed %}<span class="pill pill-green">达标</span>
+          {% else %}<span class="pill pill-red">未达标</span>{% endif %}
+        </td>
+        <td class="small">{{ at.submitted_at | dt }}</td>
+        <td>
+          {% if at.status.value == 'submitted' %}
+          <a href="/attempts/{{ at.id }}/evidence">证据页</a> ·
+          <a href="/attempts/{{ at.id }}/evidence.json" target="_blank">JSON</a>
+          {% else %}<a href="/attempts/{{ at.id }}">继续</a>{% endif %}
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="muted">还没有作答记录。</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ quiz.title }} · 测验{% endblock %}
+{% block content %}
+<a href="/dashboard" class="small">← 返回工作台</a>
+<h1 class="page-title" style="margin-top:8px">{{ quiz.title }}</h1>
+<p class="page-sub">
+  版本 v{{ attempt.quiz_version }} · 共 {{ questions|length }} 题 · 满分 {{ attempt.total_score }} 分 ·
+  你的及格线 <b>{{ required }}</b> 分
+  {% if quiz.time_limit_minutes %}· 建议用时 {{ quiz.time_limit_minutes }} 分钟{% endif %}
+</p>
+<div class="notice notice-amber">
+  题目在开卷时已固定快照；交卷后由服务端独立判分并写入证据链，结果不可修改。
+  <b>多选题少选、错选均不得分。</b>
+</div>
+
+<form method="post" action="/attempts/{{ attempt.id }}/submit" class="card">
+  {% for q in questions %}
+  <div class="q-block">
+    <div class="qhead">
+      {{ loop.index }}. （{{ q.score }} 分）{{ q.stem }}
+      <span class="qtype-tag">{% if q.qtype == 'multiple' %}多选{% elif q.qtype == 'bool' %}判断{% else %}单选{% endif %}</span>
+    </div>
+    {% set input_type = 'checkbox' if q.qtype == 'multiple' else 'radio' %}
+    {% for opt in q.options %}
+    <label class="opt">
+      <input type="{{ input_type }}" name="q{{ q.id }}" value="{{ loop.index0 }}">
+      {{ ['A','B','C','D'][loop.index0] }}. {{ opt }}
+    </label>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  <button class="btn" type="submit"
+    onclick="return confirm('确认交卷？交卷后不能修改本次答案。')">交卷并由系统判分</button>
+</form>
+{% endblock %}

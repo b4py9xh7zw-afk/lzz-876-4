@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}证据链审计{% endblock %}
+{% block container_class %}wide{% endblock %}
+{% block content %}
+<h1 class="page-title">证据链审计</h1>
+<p class="page-sub">对全部追加式事件执行哈希链重算，并交叉校验发布快照、成绩、签名。</p>
+
+<div class="card">
+  {% if report.ok %}
+  <div class="verdict-box">
+    <h2 style="margin:0 0 6px">✓ 全链校验通过</h2>
+    <p style="margin:0">共校验 {{ report.rows_checked }} 条事件
+      （{{ report.earliest | dt }} 至 {{ report.latest | dt }} UTC），
+      哈希链连续、载荷与业务数据一致，未发现篡改。</p>
+  </div>
+  {% else %}
+  <div class="verdict-box bad">
+    <h2 style="margin:0 0 6px">✗ 发现 {{ report.errors|length }} 处异常</h2>
+    <ul>{% for e in report.errors %}<li class="mono" style="font-size:13px">{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>事件流水（最近 200 条，倒序）</h2>
+  <table>
+    <thead><tr><th>#</th><th>事件类型</th><th>行为人</th><th>对象</th><th>时间(UTC)</th><th>IP</th><th>事件哈希</th></tr></thead>
+    <tbody>
+    {% for e in events %}
+      <tr>
+        <td>{{ e.seq }}</td>
+        <td class="small">{{ e.event_type }}</td>
+        <td class="small">{{ e.actor_name }}<br><span class="muted">{{ e.actor_employee_no }}</span></td>
+        <td class="small muted">
+          测验{{ e.quiz_id or '—' }} / 任务{{ e.assignment_id or '—' }} /
+          答卷{{ e.attempt_id or '—' }} / 确认{{ e.confirmation_id or '—' }}
+        </td>
+        <td class="small">{{ e.created_at | dt }}</td>
+        <td class="small">{{ e.client_ip }}</td>
+        <td class="mono" style="max-width:170px;overflow:hidden;text-overflow:ellipsis">
+          <a href="/verify?code={{ e.event_hash }}">{{ e.event_hash[:18] }}…</a>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}证据核验{% endblock %}
+{% block content %}
+<h1 class="page-title">证据独立核验</h1>
+<p class="page-sub">输入证据哈希（证据页/证据包中的 event_hash），系统将从链首重新计算全部哈希，
+并把证据中固化的题目快照、判分、签名与当前数据库逐一比对。</p>
+
+<div class="card">
+  <form method="post" action="/verify" style="display:flex;gap:10px;align-items:flex-start">
+    <input type="text" name="code" value="{{ code or '' }}" placeholder="粘贴 64 位 SHA-256 事件哈希"
+           style="font-family:monospace" required>
+    <button class="btn" type="submit">核验</button>
+  </form>
+</div>
+
+{% if code is not none and not event %}
+<div class="card"><div class="verdict-box bad"><b>未找到该证据。</b>
+  哈希对应的事件不存在，可能为伪造编号或来自其他系统。</div></div>
+{% endif %}
+
+{% if event and report %}
+<div class="card">
+  {% if report.ok %}
+  <div class="verdict-box">
+    <h2 style="margin:0 0 6px">✓ 核验通过</h2>
+    <p style="margin:0">截至事件 #{{ event.seq }} 的全部 {{ report.rows_checked }} 条记录哈希链完整，
+      且题目快照、成绩、通过结论、签署内容与当前数据库一致，未发现篡改。</p>
+  </div>
+  {% else %}
+  <div class="verdict-box bad">
+    <h2 style="margin:0 0 6px">✗ 核验失败：发现 {{ report.errors|length }} 处异常</h2>
+    <ul>{% for e in report.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>证据内容（事件 #{{ event.seq }} · {{ event.event_type }}）</h2>
+  <table>
+    <tr><th style="width:170px">发生时间(UTC)</th><td>{{ event.created_at | dt }}</td></tr>
+    <tr><th>行为人</th><td>{{ event.actor_name }}（工号 {{ event.actor_employee_no }}）</td></tr>
+    <tr><th>IP / UA</th><td class="small">{{ event.client_ip }} · {{ event.client_ua }}</td></tr>
+    <tr><th>关联</th><td class="small">测验 #{{ event.quiz_id or '—' }} ·
+      任务 #{{ event.assignment_id or '—' }} · 答卷 #{{ event.attempt_id or '—' }} ·
+      确认 #{{ event.confirmation_id or '—' }}</td></tr>
+    <tr><th>前序哈希</th><td class="mono">{{ event.prev_hash }}</td></tr>
+    <tr><th>本事件哈希</th><td class="mono">{{ event.event_hash }}</td></tr>
+  </table>
+  <details open><summary class="small">事件载荷</summary>
+    <pre class="evidence-hash" style="white-space:pre-wrap;max-height:420px;overflow:auto">{{ event.payload | json_pretty }}</pre>
+  </details>
+  {% if event.attempt_id %}
+  <p><a href="/attempts/{{ event.attempt_id }}/evidence">→ 查看该员工完整学习证据页（如有权限）</a></p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

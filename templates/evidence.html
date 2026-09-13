@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}学习证据 · {{ quiz.title }}{% endblock %}
+{% block container_class %}wide{% endblock %}
+{% block content %}
+<div style="display:flex;justify-content:space-between;align-items:start">
+  <div>
+    <h1 class="page-title">学习与合规确认证据</h1>
+    <p class="page-sub">{{ quiz.title }} · v{{ attempt.quiz_version }} · 答卷 #{{ attempt.id }}</p>
+  </div>
+  <div class="no-print">
+    <a class="btn btn-sm btn-ghost" href="/attempts/{{ attempt.id }}/evidence.json" target="_blank">下载证据包 JSON</a>
+    <button class="btn btn-sm btn-ghost" onclick="window.print()">打印 / 存 PDF</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>一、是谁、在什么岗位、什么时候学的</h2>
+  <table>
+    <tr><th style="width:180px">员工工号</th><td>{{ attempt.user.employee_no }}</td>
+        <th style="width:180px">姓名</th><td>{{ attempt.user.full_name }}</td></tr>
+    <tr><th>部门 / 岗位</th><td>{{ attempt.user.department }} / {{ attempt.user.position }}</td>
+        <th>岗位风险等级</th><td>
+          {% set rt = attempt.user.risk_tier.value %}
+          {% if rt == 'high' %}<span class="pill pill-high">高风险岗位</span>
+          {% elif rt == 'key' %}<span class="pill pill-amber">关键岗位</span>
+          {% else %}<span class="pill pill-gray">普通岗位</span>{% endif %}
+        </td></tr>
+    <tr><th>首次打开学习材料(UTC)</th>
+        <td>{{ learn_events[0].created_at | dt if learn_events else '—' }}</td>
+        <th>学习材料留痕次数</th><td>{{ learn_events|length }} 次</td></tr>
+    <tr><th>开始测验(UTC)</th><td>{{ attempt.started_at | dt }}</td>
+        <th>提交测验(UTC)</th><td>{{ attempt.submitted_at | dt }}</td></tr>
+    <tr><th>作答 IP</th><td class="mono">{{ attempt.client_ip }}</td>
+        <th>终端 UA</th><td class="small muted">{{ attempt.client_ua }}</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>二、考了多少分、门槛是多少</h2>
+  <table>
+    <tr><th style="width:180px">得分</th><td><b style="font-size:20px">{{ attempt.score }}</b> / {{ attempt.total_score }}</td></tr>
+    <tr><th>本人岗位及格线</th><td>{{ attempt.required_pass_score }} 分
+      （普通 {{ quiz.pass_score_normal }} / 关键 {{ quiz.pass_score_key }} / 高风险 {{ quiz.pass_score_high }}）</td></tr>
+    <tr><th>是否达标</th><td>
+      {% if attempt.passed %}<span class="pill pill-green">达标</span>{% else %}<span class="pill pill-red">未达标</span>{% endif %}
+      <span class="small muted">（服务端依开卷时的题目快照独立判分）</span></td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>三、学习确认签署</h2>
+  {% if confirmation %}
+  <div class="signature-box">
+    <div class="sig">{{ confirmation.signature_text }}</div>
+    <div class="small muted">电子签名</div>
+  </div>
+  <table>
+    <tr><th style="width:180px">签署人</th><td>{{ confirmation.full_name }}（{{ confirmation.employee_no }}）</td></tr>
+    <tr><th>签署时间(UTC)</th><td>{{ confirmation.signed_at | dt }}</td></tr>
+    <tr><th>签署 IP</th><td class="mono">{{ confirmation.client_ip }}</td></tr>
+    <tr><th>承诺全文</th><td class="learning" style="white-space:pre-wrap">{{ confirmation.statement }}</td></tr>
+    <tr><th>签名哈希 SHA-256</th><td class="mono">{{ confirmation.signature_hash }}</td></tr>
+  </table>
+  {% else %}
+  <div class="notice notice-amber">尚未签署学习确认。</div>
+  {% if attempt.passed and (current_user.id == attempt.user_id) %}
+  <a class="btn" href="/attempts/{{ attempt.id }}/sign">去签署</a>{% endif %}
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>四、哈希链证据时间线（防篡改）</h2>
+  <ul class="timeline">
+    {% for e in learn_events %}
+    <li>
+      <div><b>打开学习材料</b> <span class="t-time">{{ e.created_at | dt }} · #{{ e.seq }}</span></div>
+      <div class="small muted">{{ e.actor_name }}（{{ e.actor_employee_no }}）· IP {{ e.client_ip }}</div>
+      <div class="evidence-hash">{{ e.event_hash }}</div>
+    </li>
+    {% endfor %}
+    {% if submit_event %}
+    <li class="submit">
+      <div><b>提交测验并判分：{{ attempt.score }} / {{ attempt.total_score }}
+        （{{ '达标' if attempt.passed else '未达标' }}）</b>
+        <span class="t-time">{{ submit_event.created_at | dt }} · #{{ submit_event.seq }}</span></div>
+      <details><summary class="small">查看交卷证据载荷（含题目快照、作答、判分明细）</summary>
+        <pre class="evidence-hash" style="white-space:pre-wrap;max-height:340px;overflow:auto">{{ submit_event.payload | json_pretty }}</pre>
+      </details>
+      <div class="small muted">事件哈希：</div>
+      <div class="evidence-hash">{{ submit_event.event_hash }}</div>
+    </li>
+    {% endif %}
+    {% if sign_event and confirmation %}
+    <li class="signed">
+      <div><b>签署学习确认：{{ confirmation.signature_text }}</b>
+        <span class="t-time">{{ sign_event.created_at | dt }} · #{{ sign_event.seq }}</span></div>
+      <div class="small muted">签名哈希：<span class="mono">{{ confirmation.signature_hash }}</span></div>
+      <div class="evidence-hash">{{ sign_event.event_hash }}</div>
+    </li>
+    {% endif %}
+  </ul>
+  <div class="notice notice-green small">
+    以上每条记录都包含前一条记录的哈希，任何对历史成绩、签名、题目的篡改都会导致链式校验失败。
+  </div>
+  <p class="small">
+    任何人可持任一事件哈希到
+    <a href="/verify{% if submit_event %}?code={{ submit_event.event_hash }}{% endif %}">证据核验页</a>
+    独立验证真伪与完整性。
+  </p>
+</div>
+{% endblock %}

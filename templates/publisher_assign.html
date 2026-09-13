@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}开放任务 · {{ quiz.title }}{% endblock %}
+{% block content %}
+<a href="/publisher/quizzes" class="small">← 返回题库</a>
+<h1 class="page-title" style="margin-top:8px">开放学习任务</h1>
+<p class="page-sub">测验：{{ quiz.title }} · v{{ quiz.version }} ·
+及格线 普通 {{ quiz.pass_score_normal }} / 关键 {{ quiz.pass_score_key }} /
+<b>高风险 {{ quiz.pass_score_high }}</b></p>
+
+<div class="card">
+  <h2>新增开放任务</h2>
+  <form method="post" action="/publisher/quizzes/{{ quiz.id }}/assign">
+    <label class="field"><span>任务名称</span>
+      <input type="text" name="title" value="{{ quiz.title }}学习任务" required></label>
+    <div class="row2">
+      <label class="field"><span>受众范围</span>
+        <select name="scope" id="scope">
+          <option value="all">全员</option>
+          <option value="risk">按岗位风险等级（含更高等级）</option>
+          <option value="department">指定部门</option>
+          <option value="individual">指定人员</option>
+        </select>
+      </label>
+      <label class="field"><span>截止日期</span><input type="date" name="due_at"></label>
+    </div>
+
+    <div id="risk-box" style="display:none" class="field">
+      <span>最低风险等级</span>
+      <select name="risk_min">
+        <option value="normal">普通岗位及以上（全员）</option>
+        <option value="key" selected>关键 + 高风险岗位</option>
+        <option value="high">仅高风险岗位</option>
+      </select>
+    </div>
+
+    <div id="dept-box" style="display:none" class="field">
+      <span>选择部门（多选）</span>
+      <div class="checklist">
+        {% for d in departments %}<label><input type="checkbox" name="departments" value="{{ d }}"> {{ d }}</label>{% endfor %}
+      </div>
+    </div>
+
+    <div id="user-box" style="display:none" class="field">
+      <span>选择人员（多选）</span>
+      <div class="checklist">
+        {% for u in employees %}
+        <label><input type="checkbox" name="user_ids" value="{{ u.id }}">
+          {{ u.employee_no }} {{ u.full_name }} · {{ u.department }} / {{ u.position }}
+          {% if u.risk_tier.value == 'high' %}<span class="pill pill-high">高风险</span>
+          {% elif u.risk_tier.value == 'key' %}<span class="pill pill-amber">关键</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <label class="opt"><input type="checkbox" name="required" checked> 必修任务</label>
+    <div style="margin-top:14px">
+      <button class="btn" type="submit">开放任务并生成花名册</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>该测验已开放的任务</h2>
+  <table>
+    <thead><tr><th>任务</th><th>范围</th><th>开放时间</th><th>截止</th><th>状态</th><th></th></tr></thead>
+    <tbody>
+    {% for a in assignments %}
+      <tr>
+        <td>{{ a.title }}</td>
+        <td class="small">
+          {% if a.audience_scope.value == 'all' %}全员
+          {% elif a.audience_scope.value == 'risk' %}{{ {'normal':'普通及以上','key':'关键/高风险','high':'仅高风险'}.get(a.audience_value) }}
+          {% elif a.audience_scope.value == 'department' %}{{ a.audience_value }}
+          {% else %}指定人员{% endif %}
+        </td>
+        <td class="small">{{ a.opened_at | dt }}</td>
+        <td class="small">{{ a.due_at | dt }}</td>
+        <td>{% if a.closed_at %}<span class="pill pill-gray">已关闭</span>
+          {% else %}<span class="pill pill-green">开放中</span>{% endif %}</td>
+        <td><a class="btn btn-sm" href="/publisher/assignments/{{ a.id }}/roster">花名册</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+var scope = document.getElementById('scope');
+function toggle(){
+  document.getElementById('risk-box').style.display = scope.value==='risk' ? 'block':'none';
+  document.getElementById('dept-box').style.display = scope.value==='department' ? 'block':'none';
+  document.getElementById('user-box').style.display = scope.value==='individual' ? 'block':'none';
+}
+scope.addEventListener('change', toggle); toggle();
+</script>
+{% endblock %}

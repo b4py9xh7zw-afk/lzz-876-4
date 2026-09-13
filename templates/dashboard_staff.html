@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}法务/审计工作台{% endblock %}
+{% block content %}
+<h1 class="page-title">
+  {% if current_user.role.value == 'admin' %}管理员工作台{% else %}法务 / 审计工作台{% endif %}
+</h1>
+<p class="page-sub">发布红线测验、跟踪到人、核验证据链。所有操作本身也会被记录。</p>
+
+<div class="stats">
+  <div class="stat"><div class="num">{{ quizzes|length }}</div><div class="lbl">测验总数</div></div>
+  <div class="stat"><div class="num">{{ assignments|length }}</div><div class="lbl">开放任务</div></div>
+  <div class="stat"><div class="num">{{ recent_events|length }}</div><div class="lbl">最近证据事件（展示前 12 条）</div></div>
+</div>
+
+<div class="card">
+  <h2>任务花名册（按人追踪，不止统计人数）</h2>
+  <table>
+    <thead><tr><th>任务</th><th>测验</th><th>范围</th><th>开放时间</th><th>截止</th><th>状态</th><th></th></tr></thead>
+    <tbody>
+    {% for a in assignments %}
+      <tr>
+        <td><b>{{ a.title }}</b></td>
+        <td>{{ a.quiz.title }} <span class="small muted">v{{ a.quiz.version }}</span></td>
+        <td class="small">
+          {% if a.audience_scope.value == 'all' %}全员
+          {% elif a.audience_scope.value == 'risk' %}{{ {'normal':'普通及以上','key':'关键/高风险','high':'仅高风险'}.get(a.audience_value, a.audience_value) }}
+          {% elif a.audience_scope.value == 'department' %}{{ a.audience_value }}
+          {% else %}指定 {{ a.audience_value }} 人{% endif %}
+        </td>
+        <td class="small">{{ a.opened_at | dt }}</td>
+        <td class="small">{{ a.due_at | dt }}</td>
+        <td>{% if a.closed_at %}<span class="pill pill-gray">已关闭</span>{% else %}<span class="pill pill-green">开放中</span>{% endif %}</td>
+        <td><a class="btn btn-sm" href="/publisher/assignments/{{ a.id }}/roster">查看花名册</a></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="muted">还没有开放任务。</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card">
+  <h2>题库快速入口</h2>
+  <a class="btn" href="/publisher/quizzes">进入题库与测验管理</a>
+</div>
+
+<div class="card">
+  <h2>最新证据事件</h2>
+  <table>
+    <thead><tr><th>#</th><th>事件</th><th>行为人</th><th>时间(UTC)</th><th>哈希</th></tr></thead>
+    <tbody>
+    {% for e in recent_events %}
+      <tr>
+        <td>{{ e.seq }}</td>
+        <td class="small">{{ e.event_type }}</td>
+        <td class="small">{{ e.actor_name }}（{{ e.actor_employee_no }}）</td>
+        <td class="small">{{ e.created_at | dt }}</td>
+        <td class="mono" style="max-width:180px;overflow:hidden;text-overflow:ellipsis">{{ e.event_hash[:16] }}…</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p style="margin-top:10px"><a href="/publisher/evidence">→ 查看完整证据链并执行完整性校验</a></p>
+</div>
+{% endblock %}

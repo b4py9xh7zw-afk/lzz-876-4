@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}企业内控合规测评平台{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+{% if current_user %}
+<header class="topbar">
+  <div class="brand">🛡️ 内控合规测评平台</div>
+  <nav>
+    <a href="/dashboard">工作台</a>
+    {% if current_user.role.value == 'employee' %}
+      <a href="/dashboard#assignments">我的学习任务</a>
+    {% else %}
+      <a href="/publisher/quizzes">题库与测验</a>
+      <a href="/publisher/evidence">证据链审计</a>
+      {% if current_user.role.value == 'admin' %}<a href="/admin/users">人员管理</a>{% endif %}
+    {% endif %}
+    <a href="/verify">证据核验</a>
+  </nav>
+  <div class="who">
+    <b>{{ current_user.full_name }}</b>（{{ current_user.employee_no }}）
+    {% if current_user.role.value == 'publisher' %}法务/审计
+    {% elif current_user.role.value == 'admin' %}管理员
+    {% else %}员工{% endif %}
+  </div>
+  <form method="post" action="/logout"><button class="btn-logout" type="submit">退出</button></form>
+</header>
+{% endif %}
+<main class="container {% block container_class %}{% endblock %}">
+  {% for m in flash_messages %}
+  <div class="flash flash-{{ m.category }}">{{ m.message }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</main>
+{% block scripts %}{% endblock %}
+</body>
+</html>

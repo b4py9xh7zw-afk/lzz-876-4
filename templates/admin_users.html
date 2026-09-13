@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}人员管理{% endblock %}
+{% block content %}
+<h1 class="page-title">人员与岗位风险管理</h1>
+<p class="page-sub">维护员工账号、部门岗位与风险等级。高风险岗位将被强制适用高及格线。所有变更写入证据链。</p>
+
+<div class="card">
+  <h2>新增账号</h2>
+  <form method="post" action="/admin/users/create">
+    <div class="row3">
+      <label class="field"><span>工号</span><input type="text" name="employee_no" required></label>
+      <label class="field"><span>用户名</span><input type="text" name="username" required></label>
+      <label class="field"><span>姓名</span><input type="text" name="full_name" required></label>
+    </div>
+    <div class="row3">
+      <label class="field"><span>部门</span><input type="text" name="department"></label>
+      <label class="field"><span>岗位</span><input type="text" name="position"></label>
+      <label class="field"><span>初始密码（≥8位）</span><input type="text" name="password" required></label>
+    </div>
+    <div class="row3">
+      <label class="field"><span>角色</span>
+        <select name="role">
+          <option value="employee">员工</option>
+          <option value="publisher">法务/审计（发布者）</option>
+          <option value="admin">管理员</option>
+        </select>
+      </label>
+      <label class="field"><span>岗位风险等级</span>
+        <select name="risk_tier">
+          <option value="normal">普通岗位（60）</option>
+          <option value="key">关键岗位（80）</option>
+          <option value="high">高风险岗位（90，硬门槛）</option>
+        </select>
+      </label>
+      <label class="field"><span>&nbsp;</span><button class="btn" type="submit">创建账号</button></label>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>账号列表（{{ users|length }}）</h2>
+  {% for u in users %}
+  <details class="editor-q" {% if not u.is_active %}style="opacity:.65"{% endif %}>
+    <summary>
+      {{ u.employee_no }} · <b>{{ u.full_name }}</b> · {{ u.department }} / {{ u.position }}
+      {% if u.risk_tier.value == 'high' %}<span class="pill pill-high">高风险</span>
+      {% elif u.risk_tier.value == 'key' %}<span class="pill pill-amber">关键</span>
+      {% else %}<span class="pill pill-gray">普通</span>{% endif %}
+      {% if u.role.value == 'publisher' %}<span class="pill pill-blue">法务/审计</span>
+      {% elif u.role.value == 'admin' %}<span class="pill pill-blue">管理员</span>{% endif %}
+      {% if not u.is_active %}<span class="pill pill-red">已停用</span>{% endif %}
+    </summary>
+    <form method="post" action="/admin/users/{{ u.id }}/update" style="margin-top:10px">
+      <div class="row3">
+        <label class="field"><span>部门</span><input type="text" name="department" value="{{ u.department }}"></label>
+        <label class="field"><span>岗位</span><input type="text" name="position" value="{{ u.position }}"></label>
+        <label class="field"><span>重置密码（留空不改）</span><input type="text" name="new_password"></label>
+      </div>
+      <div class="row3">
+        <label class="field"><span>角色</span>
+          <select name="role">
+            {% for r in roles %}<option value="{{ r.value }}" {{ 'selected' if u.role == r }}>{{ r.value }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field"><span>风险等级</span>
+          <select name="risk_tier">
+            {% for t in tiers %}<option value="{{ t.value }}" {{ 'selected' if u.risk_tier == t }}>
+              {{ risk_labels[t.value] }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="field"><span>状态</span>
+          <label class="opt"><input type="checkbox" name="is_active" {{ 'checked' if u.is_active }}> 账号启用</label>
+        </label>
+      </div>
+      <button class="btn btn-sm" type="submit">保存修改（留痕）</button>
+    </form>
+  </details>
+  {% endfor %}
+</div>
+{% endblock %}

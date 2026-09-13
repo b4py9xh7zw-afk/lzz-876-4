@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}题库与测验{% endblock %}
+{% block content %}
+<h1 class="page-title">题库与测验管理</h1>
+<p class="page-sub">法务/审计可在此创建反舞弊、数据安全、采购红线等测验；发布后员工才能作答。</p>
+
+<div class="card">
+  <h2>新建测验</h2>
+  <form method="post" action="/publisher/quizzes/create">
+    <div class="row2">
+      <label class="field"><span>测验标题</span><input type="text" name="title" required></label>
+      <label class="field"><span>红线类别</span>
+        <select name="category">
+          <option value="anti_fraud">反舞弊</option>
+          <option value="data_security">数据安全</option>
+          <option value="procurement">采购红线</option>
+          <option value="other">其他合规</option>
+        </select>
+      </label>
+    </div>
+    <label class="field"><span>测验说明</span><textarea name="description"></textarea></label>
+    <label class="field"><span>学习材料（员工开考前必读）</span><textarea name="learning_content" style="min-height:120px"></textarea></label>
+    <div class="row3">
+      <label class="field"><span>普通岗及格线</span><input type="number" name="pass_score_normal" value="60" min="1" max="100"></label>
+      <label class="field"><span>关键岗及格线</span><input type="number" name="pass_score_key" value="80" min="1" max="100"></label>
+      <label class="field"><span>高风险岗及格线（硬门槛）</span><input type="number" name="pass_score_high" value="90" min="1" max="100"></label>
+    </div>
+    <button class="btn" type="submit">创建（草稿）</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>全部测验</h2>
+  <table>
+    <thead><tr><th>标题</th><th>类别</th><th>状态</th><th>版本</th><th>题目数</th><th>门槛(普/关/高)</th><th>累计作答</th><th>操作</th></tr></thead>
+    <tbody>
+    {% for q in quizzes %}
+      <tr>
+        <td><b>{{ q.title }}</b><br><span class="small muted">{{ q.description[:40] }}</span></td>
+        <td>{{ category_labels.get(q.category, q.category) }}</td>
+        <td>
+          {% if q.status.value == 'published' %}<span class="pill pill-green">已发布</span>
+          {% elif q.status.value == 'closed' %}<span class="pill pill-gray">已关闭</span>
+          {% else %}<span class="pill pill-amber">草稿</span>{% endif %}
+        </td>
+        <td>v{{ q.version }}</td>
+        <td>{{ q.questions|length }}</td>
+        <td>{{ q.pass_score_normal }} / {{ q.pass_score_key }} / {{ q.pass_score_high }}</td>
+        <td>{{ stats[q.id] }}</td>
+        <td class="small">
+          <a href="/publisher/quizzes/{{ q.id }}/edit">编辑题目</a>
+          {% if q.status.value == 'draft' %}
+            · <form method="post" action="/publisher/quizzes/{{ q.id }}/publish" class="inline">
+              <button class="btn btn-sm" type="submit"
+                onclick="return confirm('发布将固化题目快照并记录哈希，确认？')">发布</button></form>
+          {% elif q.status.value == 'published' %}
+            · <a href="/publisher/quizzes/{{ q.id }}/assign">开放任务</a>
+            · <form method="post" action="/publisher/quizzes/{{ q.id }}/close" class="inline">
+              <button class="btn btn-sm btn-ghost" type="submit">关闭</button></form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
